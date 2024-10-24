@@ -1,0 +1,76 @@
+using HtmlAgilityPack;
+using System;
+using System.Net.Http;
+using System.Threading.Tasks;
+using MailKit.Net.Smtp;
+using MimeKit;
+using System.Timers;
+
+class Program
+{
+    static async Task Main(string[] args)
+    {
+        var url = "https://skiptheline.ncdot.gov/Webapp/Appointment/Index/a7ade79b-996d-4971-8766-97feb75254de";
+        var client = new HttpClient();
+        var response = await client.GetStringAsync(url);
+
+        var doc = new HtmlDocument();
+        doc.LoadHtml(response);
+
+        // Example of finding appointment availability (this depends on the actual HTML structure)
+        var availability = doc.DocumentNode.SelectSingleNode("//div[@class='appointment-availability']");
+
+        if (availability != null)
+        {
+            Console.WriteLine("Appointment available!");
+            // Call your notification method here
+        }
+        else
+        {
+            Console.WriteLine("No appointments available.");
+        }
+    }
+
+    public static void SendEmailNotification()
+    {
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress("DMV Notifier", "your-email@example.com"));
+        message.To.Add(new MailboxAddress("User", "user-email@example.com"));
+        message.Subject = "DMV Appointment Available";
+        message.Body = new TextPart("plain")
+        {
+            Text = "An appointment slot is now available at your nearest DMV. Please visit the DMV website to book."
+        };
+
+        using (var client = new SmtpClient())
+        {
+            client.Connect("smtp.example.com", 587, false);
+            client.Authenticate("your-email@example.com", "your-email-password");
+            client.Send(message);
+            client.Disconnect(true);
+        }
+    }
+
+    private static Timer _timer;
+
+    static void Main(string[] args)
+    {
+        _timer = new Timer(3600000); // Set interval to 1 hour
+        _timer.Elapsed += CheckForAppointments;
+        _timer.Start();
+
+        Console.WriteLine("Press Enter to exit...");
+        Console.ReadLine();
+    }
+
+    private static async void CheckForAppointments(object sender, ElapsedEventArgs e)
+    {
+        await ScrapeForAppointments();
+
+        // If appointments are found, send notification
+        if (appointmentsAvailable)
+        {
+            SendEmailNotification();
+        }
+    }
+}
